@@ -1,17 +1,11 @@
-from itertools import count
 import math
 import fileinput
-import time
 import numpy as np
 import os
-# import ctypes as c
-# import multiprocessing as mp
-from multiprocessing import Process,Value,Array,Lock
+from joblib import Parallel, delayed
+import tempfile
 
-count_elephants = 0
-# mass_elephants = np.array([])
-# initial_elephant_order = np.array([])
-# target_elephant_order = np.array([])
+count_elephants = np.int64(0)
 
 mass_elephants_ = []
 initial_elephant_order_ = []
@@ -23,9 +17,6 @@ minw = math.inf
 
 file_lines = []
 
-start = time.time()
-
-
 for line in fileinput.input():
     file_lines.append(line)
 
@@ -33,58 +24,51 @@ count_elephants = (int(file_lines[0]))
 
 for word in file_lines[1].split():
     mass_elephants_.append(int(word))
-    #mass_elephants = np.append(mass_elephants,int(word))
 
 for word in file_lines[2].split():
     initial_elephant_order_.append(int(word)-1)
-    #initial_elephant_order = np.append(initial_elephant_order,int(word)-1)
 
 for word in file_lines[3].split():
     target_elephant_order_.append(int(word)-1)
-    #target_elephant_order = np.append(target_elephant_order,int(word)-1)
     
-    
-middle1 = time.time()    
-
-mass_elephants = np.array(mass_elephants_)
-initial_elephant_order = np.array(initial_elephant_order_)
-target_elephant_order = np.array(target_elephant_order_)
-
-
-middle12 = time.time()
+mass_elephants = np.array(mass_elephants_, dtype=np.int64)
+initial_elephant_order = np.array(initial_elephant_order_, dtype=np.int64)
+target_elephant_order = np.array(target_elephant_order_, dtype=np.int64)
 
 # ----------- Algorithm's Initialization -------------
 
-#p_x = [0] * (count_elephants)
-p_x = np.zeros(count_elephants, dtype = int)
+path = tempfile.mkdtemp()
+memmap_path = os.path.join(path,'ab3.mmap')
 
-    
-for i in range(len(p_x)):
-    p_x[int(initial_elephant_order[i])] = int(initial_elephant_order[int(np.where(target_elephant_order == initial_elephant_order[i])[0][0])])
+p_x = np.zeros(count_elephants, dtype = np.int64)
 
+def process(i):   
+    p_x_memmap[int(initial_elephant_order[i])] = int(initial_elephant_order[int(np.where(target_elephant_order == initial_elephant_order[i])[0][0])])
 
-
-
-middle2 = time.time()
+p_x_memmap = np.memmap(memmap_path, dtype=np.int64, shape=(np.size(p_x)), mode='w+')
+Parallel(n_jobs=-2)(delayed(process)(i) for i in range(0,np.size(p_x)))
+p_x[:] = p_x_memmap[:]
 
 minw = min(mass_elephants)
 
-#is_visited = [False] * (count_elephants)
 is_visited = np.full(count_elephants,False)
 
-#----------------  Main Algorithm LOOP ----------------
+#----------------  Main Algorithm Loop ----------------
 
-w = 0
+TWO = np.int64(2)
+ONE = np.int64(1)
 
+w = np.int64(0)
 
 for i in range(count_elephants):
 
     min_cycle_mass = math.inf
-    suma = 0
+    suma = np.int64(0)
+    
 
     if(is_visited[i] == False):
-        cycle_length = 0
-        x = i
+        cycle_length = np.int64(0)
+        x = np.int64(i)
 
         while(True):
             suma += mass_elephants[x]
@@ -92,19 +76,10 @@ for i in range(count_elephants):
             
             is_visited[x] = True
             x = p_x[x]
-            cycle_length += 1
+            cycle_length += ONE
             if(x == i):
                 break
 
-        w += min(suma + (cycle_length-2)*min_cycle_mass, suma + min_cycle_mass + (cycle_length+1) * minw )
+        w += min(suma + (cycle_length-TWO)*min_cycle_mass, suma + min_cycle_mass + (cycle_length+ONE) * minw )
     
 print(w)
-
-end = time.time()
-
-print("TIME start-middle1:" + str(middle1-start))
-#print("TIME middle1-middle2:" + str(middle2-middle1))
-print("TIME middle1-middle12:" + str(middle12-middle1))
-print("TIME middle12-middle2:" + str(middle2-middle12))
-print("TIME middle2-end:" + str(end-middle2))
-print("TIME start-end:" + str(end-start))
